@@ -1,0 +1,52 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12"]
+
+    name: "Python ${{ matrix.python }}"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: "pip"
+
+      - name: Install torchhull
+        run: python -m pip install --editable ".[dev]"
+
+      - name: Run linters
+        run: nox -s lint
+
+  check_lint:
+    if: always()
+
+    needs:
+      - lint
+
+    name: "Check Lint"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

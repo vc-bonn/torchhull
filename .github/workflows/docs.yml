@@ -1,0 +1,104 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+  release:
+    types:
+      - published
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up CUDA toolkit
+        uses: Jimver/cuda-toolkit@master
+        with:
+          cuda: "12.1.0"
+          method: "network"
+          sub-packages: '["toolkit"]'
+
+      - name: Install torch with CUDA support
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+      - name: Install torchhull
+        run: python -m pip install --editable ".[dev]"
+
+      - name: Build docs
+        run: nox -s docs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Docs HTML
+          path: build/docs/html
+
+  publish:
+    name: Upload release to GitHub Pages
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release' && github.event.action == 'published'
+
+    needs:
+      - build
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Docs HTML
+          path: build/docs/html
+
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: build/docs/html
+          clean: true
+          single-commit: true
+
+  check_docs:
+    if: always()
+
+    needs:
+      - build
+      - publish
+
+    name: "Check Docs"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: re-actors/alls-green@release/v1
+        with:
+          allowed-skips: publish
+          jobs: ${{ toJSON(needs) }}
