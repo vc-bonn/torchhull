@@ -1,0 +1,175 @@
+[project]
+name = "torchhull"
+version = "0.0.1"
+authors = [{ name = "Patrick Stotko", email = "stotko@cs.uni-bonn.de" }]
+description = "A fast Visual Hull implementation"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["torch", "numpy", "charonload"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: C++",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Intended Audience :: Science/Research",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/vc-bonn/torchhull"
+Repository = "https://github.com/vc-bonn/torchhull"
+Documentation = "https://vc-bonn.github.io/torchhull/"
+Changelog = "https://github.com/vc-bonn/torchhull/blob/main/CHANGELOG.md"
+
+
+[project.optional-dependencies]
+dev = [
+    # Packaging
+    "build",
+
+    # Formatting
+    "black~=24.0",
+    "isort",
+    "docformatter",
+    "clang-format~=14.0",
+
+    # Linting
+    "ruff>=0.2",
+    "mypy",
+    "codespell",
+    "check-manifest",
+
+    # Documentation
+    "sphinx",
+    "furo",
+    "sphinx-autobuild",
+    "sphinx-autodoc-typehints>=2.0",
+    "sphinx_autodoc_defaultargs",
+    "sphinx_copybutton",
+    "myst-parser",
+    "docutils>=0.17",
+
+    # Tests
+    "moderngl",
+    "pillow",
+    "pytest",
+    "pytest-benchmark",
+    "scipy",
+    "trimesh",
+
+    # Other
+    "nox",
+]
+
+
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.black]
+line-length = 120
+
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+py_version = 39
+
+
+[tool.docformatter]
+wrap-summaries = 120
+wrap-descriptions = 120
+pre-summary-newline = true
+tab-width = 4
+black = true
+syntax = "numpy"
+
+
+[tool.ruff]
+src = ["src"]
+line-length = 120
+output-format = "full"
+
+
+[tool.ruff.lint]
+preview = false
+select = ["ALL"]
+ignore = [
+    # General rules
+    "C90", # mccabe
+    "D",   # pydocstyle (Still disabled despite partial configuration)
+    "TD",  # flake8-todos
+    "FIX", # flake8-fixme
+    # Specific rules
+    "COM812",  # trailing-comma-missing
+    "PLR0912", # too-many-branches
+    "PLR0913", # too-many-args
+    "PLR0915", # too-many-statements
+]
+
+
+[tool.ruff.lint.per-file-ignores]
+"benchmarks/*" = [
+    "D",   # pydocstyle
+    "INP", # flake8-no-pep420
+]
+"src/torchhull/__init__.py" = [
+    "E402", # module-import-not-at-top-of-file
+]
+"tests/*" = [
+    "D",      # pydocstyle
+    "S101",   # assert-used
+    "FBT001", # boolean-type-hint-positional-argument
+    "INP",    # flake8-no-pep420
+    "PT011",  # raises-too-broad
+]
+"docs/conf.py" = [
+    "D100", # undocumented-public-module
+    "INP",  # flake8-no-pep420
+    "ERA",  # eradicate
+]
+"tools/*.py" = [
+    "D",   # pydocstyle
+    "INP", # flake8-no-pep420
+]
+"tools/process_changelog.py" = [
+    "S310", # suspicious-url-open-usage
+]
+"noxfile.py" = [
+    "D100", # undocumented-public-module
+]
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+
+[tool.mypy]
+plugins = ["numpy.typing.mypy_plugin"]
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+warn_return_any = true
+warn_unused_configs = true
+pretty = true
+mypy_path = "data"
+#ignore_missing_imports = true                                                # This could be made local for the tests
+
+
+[tool.check-manifest]
+ignore = [
+    ".vscode/**/*",
+    "benchmarks/**/*",
+    "docs/**/*",
+    "tests/**/*",
+    ".clang-format",
+    "CHANGELOG.md",
+    "noxfile.py",
+]

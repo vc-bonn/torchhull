@@ -1,0 +1,10 @@
+build
+__pycache__
+.*_cache
+*.py[cod]
+src/torchhull.egg-info
+typings
+.coverage*
+.benchmarks
+.nox
+data/cache
