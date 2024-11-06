@@ -1,6 +1,6 @@
 [project]
 name = "torchhull"
-version = "0.0.1"
+version = "0.1.0"
 authors = [{ name = "Patrick Stotko", email = "stotko@cs.uni-bonn.de" }]
 description = "A fast Visual Hull implementation"
 readme = "README.md"
