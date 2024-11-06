@@ -1,0 +1,55 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+template: |
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+
+  ---
+
+  ### Release Guide
+
+  1. Bump version in `pyproject.toml`
+  2. Update `CHANGELOG.md` with notes from release draft and header with version and release date
+  3. Process links in `CHANGELOG.md` and check release date by calling `tools/process_changelog.py`
+  4. Open a PR with the above changes and merge it
+  5. Release the version by editing the draft
+
+categories:
+  - title: Added
+    labels:
+      - added
+  - title: Changed
+    labels:
+      - changed
+  - title: Deprecated
+    labels:
+      - deprecated
+  - title: Removed
+    labels:
+      - removed
+  - title: Fixed
+    labels:
+      - fixed
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+
+version-resolver:
+  major:
+    labels:
+      - major
+  minor:
+    labels:
+      - minor
+  patch:
+    labels:
+      - patch
+  default: patch
+
+include-labels:
+  - "added"
+  - "changed"
+  - "deprecated"
+  - "removed"
+  - "fixed"
