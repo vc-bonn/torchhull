@@ -61,6 +61,7 @@ jobs:
         with:
           name: Docs HTML
           path: build/docs/html
+          include-hidden-files: true
 
   publish:
     name: Upload release to GitHub Pages
