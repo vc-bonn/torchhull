@@ -171,6 +171,12 @@ def lint(session: nox.Session) -> None:
 
 
 @nox.session
+def build(session: nox.Session) -> None:
+    """Run the compilation (REQUIRES '--no-venv')."""
+    session.run("python", "-c", "import torch; import torchhull", external=True)
+
+
+@nox.session
 def benchmarks(session: nox.Session) -> None:
     """Runs the benchmarks."""
     session.run("pytest", "benchmarks", "--benchmark-sort=fullname", external=True)
