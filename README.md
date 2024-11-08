@@ -15,6 +15,9 @@
 <a href="https://github.com/vc-bonn/torchhull/blob/main/LICENSE">
     <img alt="GitHub License" src="https://img.shields.io/badge/License-BSD--3--Clause-green.svg"/>
 </a>
+<a href="https://github.com/vc-bonn/torchhull/actions/workflows/build.yml">
+    <img alt="Build" src="https://github.com/vc-bonn/torchhull/actions/workflows/build.yml/badge.svg">
+</a>
 <a href="https://github.com/vc-bonn/torchhull/actions/workflows/lint.yml">
     <img alt="Lint" src="https://github.com/vc-bonn/torchhull/actions/workflows/lint.yml/badge.svg">
 </a>

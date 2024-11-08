@@ -1,0 +1,87 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-22.04"]  # "windows-2022" # Disabled until solution/workaround for NVTX is present
+        python: ["3.9", "3.10", "3.11", "3.12"]
+
+    name: "${{ matrix.os }} / Python ${{ matrix.python }}"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: "pip"
+
+      - name: Set up CUDA toolkit (Ubuntu)
+        if: runner.os == 'Linux'
+        uses: Jimver/cuda-toolkit@master
+        with:
+          cuda: "12.1.0"
+          method: "network"
+          sub-packages: '["toolkit"]'
+
+      - name: Set up CUDA toolkit (Windows)
+        if: runner.os == 'Windows'
+        uses: Jimver/cuda-toolkit@master
+        with:
+          cuda: "12.4.0"
+          method: "network"
+
+      - name: Install torch with CUDA support (Ubuntu)
+        if: runner.os == 'Linux'
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+      - name: Install torch with CUDA support (Windows)
+        if: runner.os == 'Windows'
+        run: python -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+
+      - name: Install torchhull
+        run: python -m pip install --editable ".[dev]"
+
+      - name: Run compilation
+        run: nox --no-venv -s build
+
+  check_build:
+    if: always()
+
+    needs:
+      - build
+
+    name: "Check Build"
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
