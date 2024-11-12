@@ -5,7 +5,7 @@ authors = [{ name = "Patrick Stotko", email = "stotko@cs.uni-bonn.de" }]
 description = "A fast Visual Hull implementation"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["torch", "numpy", "charonload"]
+dependencies = ["torch", "charonload"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
@@ -59,6 +59,7 @@ dev = [
 
     # Tests
     "moderngl",
+    "numpy",
     "pillow",
     "pytest",
     "pytest-benchmark",
