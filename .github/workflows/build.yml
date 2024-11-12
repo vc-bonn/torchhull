@@ -17,8 +17,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ["ubuntu-22.04"]  # "windows-2022" # Disabled until solution/workaround for NVTX is present
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        os: ["ubuntu-22.04"] # "windows-2022" # Disabled until solution/workaround for NVTX is present
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     name: "${{ matrix.os }} / Python ${{ matrix.python }}"
     runs-on: ${{ matrix.os }}
