@@ -21,7 +21,7 @@ import sys
 required_version = (3, 9)
 
 if sys.version_info[:2] < required_version:  # pragma: no cover
-    msg = "%s requires Python %d.%d+" % (__package__, *required_version)
+    msg = "%s requires Python %d.%d+" % (__package__, *required_version)  # noqa: UP031
     raise RuntimeError(msg)
 
 del required_version
