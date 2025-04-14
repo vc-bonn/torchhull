@@ -36,7 +36,7 @@ dev = [
     "build",
 
     # Formatting
-    "black~=24.0",
+    "black~=25.0",
     "isort",
     "docformatter",
     "clang-format~=14.0",
