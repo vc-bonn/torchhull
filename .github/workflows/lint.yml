@@ -20,7 +20,7 @@ jobs:
         python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
 
     name: "Python ${{ matrix.python }}"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
       - lint
 
     name: "Check Lint"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: re-actors/alls-green@release/v1
