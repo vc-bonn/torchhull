@@ -1,4 +1,5 @@
 #include <array>
+#include <type_traits>
 
 #include <ATen/Dispatch.h>
 #include <ATen/cuda/ApplyGridUtils.cuh>
@@ -7,6 +8,7 @@
 #include <c10/macros/Macros.h>
 #include <cub/device/device_select.cuh>
 #include <glm/common.hpp>
+#include <glm/gtc/epsilon.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -55,13 +57,24 @@ check_integral_image(const torch::PackedTensorAccessor64<ImageT, 4, torch::Restr
             auto image_value = static_cast<IntegralT>(image[p.z][p.y][p.x][c]);
             auto image_value_integral = integral_11 + integral_00 - integral_10 - integral_01;
 
-            valid[p.z][p.y][p.x][c] = (image_value == image_value_integral);
+            if constexpr (std::is_floating_point_v<IntegralT>)
+            {
+                // NOTE: Due to the large range of sizes, numerical errors may quickly build up
+                const auto epsilon = IntegralT{ 1e-1 };
+
+                valid[p.z][p.y][p.x][c] =
+                        glm::epsilonEqual(static_cast<IntegralT>(image_value), image_value_integral, epsilon);
+            }
+            else
+            {
+                valid[p.z][p.y][p.x][c] = (image_value == image_value_integral);
+            }
         }
     }
 }
 
 torch::Tensor
-integral_image(const torch::Tensor& self, c10::optional<c10::ScalarType> dtype = c10::nullopt)
+integral_image(const torch::Tensor& self, c10::ScalarType dtype)
 {
     TORCH_CHECK_EQ(self.dim(), 4); // N, H, W, C
 
@@ -155,7 +168,7 @@ struct select1st
 template <typename TransformT>
 __global__ void
 classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> candidates,
-                       const torch::PackedTensorAccessor64<int32_t, 4, torch::RestrictPtrTraits> integral_masks,
+                       const torch::PackedTensorAccessor64<float, 4, torch::RestrictPtrTraits> integral_masks,
                        const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
                        const glm::i64vec3 resolution,
                        const glm::i64vec3 resolution_children,
@@ -235,14 +248,22 @@ classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
 
             auto integral_bb = integral_mask_11 + integral_mask_00 - integral_mask_10 - integral_mask_01;
 
-            CUDA_DEVICE_CHECK(integral_bb >= 0);
-            CUDA_DEVICE_CHECK(integral_bb <= area_bb);
+            // NOTE: Due to the large range of sizes, numerical errors may quickly build up
+            const auto epsilon = 1e-1f;
 
-            if (integral_bb == 0 || (bb_min.x >= 1.f || bb_max.x <= -1.f || bb_min.y >= 1.f || bb_max.y <= -1.f))
+            CUDA_DEVICE_CHECK(integral_bb >= 0.f - epsilon);
+            CUDA_DEVICE_CHECK(integral_bb <= static_cast<float>(area_bb) + epsilon);
+
+            // Take the (image) isolevel into account when evaluating the accumulated mask values
+            const auto isolevel = 0.5f;
+            const float margin_isosurface = isolevel - epsilon;
+
+            if (integral_bb <= 0.f + margin_isosurface ||
+                (bb_min.x >= 1.f || bb_max.x <= -1.f || bb_min.y >= 1.f || bb_max.y <= -1.f))
             {
                 is_empty = true;
             }
-            else if (integral_bb == area_bb)
+            else if (integral_bb >= static_cast<float>(area_bb) - margin_isosurface)
             {
                 is_object = true;
             }
@@ -259,7 +280,7 @@ classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
 template <typename TransformT>
 __global__ void
 classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> candidates,
-                          const torch::PackedTensorAccessor64<int32_t, 4, torch::RestrictPtrTraits> integral_masks,
+                          const torch::PackedTensorAccessor64<float, 4, torch::RestrictPtrTraits> integral_masks,
                           const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
                           const glm::i64vec3 resolution,
                           const glm::i64vec3 resolution_children,
@@ -351,17 +372,24 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
             auto integral_bb = integral_mask_11 + integral_mask_00 - integral_mask_10 - integral_mask_01;
             auto full_integral_bb = full_area_bb - area_bb + integral_bb;
 
-            CUDA_DEVICE_CHECK(integral_bb >= 0);
-            CUDA_DEVICE_CHECK(integral_bb <= area_bb);
+            // NOTE: Due to the large range of sizes, numerical errors may quickly build up
+            const auto epsilon = 1e-1f;
 
-            CUDA_DEVICE_CHECK(full_integral_bb >= 0);
-            CUDA_DEVICE_CHECK(full_integral_bb <= full_area_bb);
+            CUDA_DEVICE_CHECK(integral_bb >= 0.f - epsilon);
+            CUDA_DEVICE_CHECK(integral_bb <= static_cast<float>(area_bb) + epsilon);
 
-            if (full_integral_bb == 0)
+            CUDA_DEVICE_CHECK(full_integral_bb >= 0.f - epsilon);
+            CUDA_DEVICE_CHECK(full_integral_bb <= static_cast<float>(full_area_bb) + epsilon);
+
+            // Take the (image) isolevel into account when evaluating the accumulated mask values
+            const auto isolevel = 0.5f;
+            const float margin_isosurface = isolevel - epsilon;
+
+            if (full_integral_bb <= 0.f + margin_isosurface)
             {
                 is_empty = true;
             }
-            else if (integral_bb == area_bb && area_bb == full_area_bb)
+            else if (integral_bb >= static_cast<float>(area_bb) - margin_isosurface && area_bb == full_area_bb)
             {
                 is_object = true;
             }
@@ -511,7 +539,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
     const auto dtype_int64 = torch::TensorOptions{}.dtype(torch::kInt64).device(masks.device());
     const auto dtype_float = torch::TensorOptions{}.dtype(torch::kFloat32).device(masks.device());
 
-    auto integral_masks = integral_image(masks, torch::kInt32);
+    auto integral_masks = integral_image(masks, torch::kFloat32);
     auto candidates = torch::tensor({ 0 }, dtype_int64);
     auto candidates_octree = std::vector<torch::Tensor>{};
     candidates_octree.push_back(candidates);
@@ -528,7 +556,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
         auto occupied_voxel = torch::empty({ N }, dtype_uint8).contiguous();
 
         auto candidates_ = candidates.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>();
-        auto integral_masks_ = integral_masks.packed_accessor64<int32_t, 4, torch::RestrictPtrTraits>();
+        auto integral_masks_ = integral_masks.packed_accessor64<float, 4, torch::RestrictPtrTraits>();
         auto occupied_voxel_ = occupied_voxel.packed_accessor64<uint8_t, 1, torch::RestrictPtrTraits>();
 
         AT_DISPATCH_FLOATING_TYPES_AND_HALF(
@@ -715,7 +743,8 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
 
     auto sparse_indices_ = sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>();
     auto sparse_values_ = sparse_values.packed_accessor64<float, 1, torch::RestrictPtrTraits>();
-    AT_DISPATCH_ALL_TYPES(
+    AT_DISPATCH_ALL_TYPES_AND(
+            torch::ScalarType::Half,
             masks.scalar_type(),
             "accumulate_hull_counts",
             [&]()
