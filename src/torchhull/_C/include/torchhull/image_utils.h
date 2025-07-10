@@ -112,6 +112,39 @@ sample_border_padding(const torch::PackedTensorAccessor64<ValueT, 4, torch::Rest
 }
 
 template <typename ValueT>
+inline C10_DEVICE ValueT
+sample_reflect_padding(const torch::PackedTensorAccessor64<ValueT, 4, torch::RestrictPtrTraits> image,
+                       const int64_t y,
+                       const int64_t x,
+                       const int batch,
+                       const int channel)
+{
+    // Note: image has dims (N, H, W, C) instead of (N, C, H, W)
+    const auto H = image.size(1);
+    const auto W = image.size(2);
+
+    // NOTE
+    // ----
+    // The border value is NOT reflected, only the "inner" part should be considered.
+    //
+    // Example: N = 5
+    //
+    // Input:     0 1 2 3 4
+    // Reflected: 0 1 2 3 | 4 3 2 1 | 0 1 2 3 | 4 3 2 1 | 0 1 2 3 | ...
+    //
+    // The negative direction works exactly the same, but starts with 1 instead of 0 flips.
+    const auto flips_y = y / (H - 1) + (y < 0);
+    const auto flips_x = x / (W - 1) + (x < 0);
+    const auto remainder_y = mod(y, H - 1);
+    const auto remainder_x = mod(x, W - 1);
+
+    const auto index_y = (flips_y % 2 == 0) ? remainder_y : (H - 1) - remainder_y;
+    const auto index_x = (flips_x % 2 == 0) ? remainder_x : (W - 1) - remainder_x;
+
+    return image[batch][index_y][index_x][channel];
+}
+
+template <typename ValueT>
 inline C10_DEVICE float
 sample_bilinear_mode_zeros_padding(const torch::PackedTensorAccessor64<ValueT, 4, torch::RestrictPtrTraits> image,
                                    const float y,

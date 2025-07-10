@@ -1,11 +1,20 @@
 #pragma once
 
 #include <cmath>
+#include <type_traits>
 
 #include <c10/macros/Macros.h>
 
 namespace torchhull
 {
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T>, void>>
+inline C10_HOST_DEVICE T
+mod(const T x, const T y)
+{
+    T rem = x % y;
+    return (rem >= 0) ? rem : rem + y;
+}
 
 inline C10_HOST_DEVICE float
 lerp(const float v0, const float v1, const float t)

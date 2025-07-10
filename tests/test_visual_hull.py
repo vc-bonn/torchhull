@@ -165,6 +165,59 @@ def test_visual_hull(
     "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
 )
 @pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
+def test_visual_hull_with_blur(
+    level: int,
+    masks_partial: bool,
+    unique_verts: bool,
+    dtype_masks: torch.dtype,
+    dtype_transforms: torch.dtype,
+) -> None:
+    data_dir = pathlib.Path(__file__).parents[1] / "data"
+    file = "Armadillo.ply"
+
+    projection_matrices, view_matrices, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    transforms = projection_matrices @ view_matrices
+
+    masks = masks.to(dtype=dtype_masks, device=DEVICE)
+    transforms = transforms.to(dtype=dtype_transforms, device=DEVICE)
+
+    kernel_size = 9
+    sigma = 2
+    masks = torchhull.gaussian_blur(
+        images=masks,
+        kernel_size=kernel_size,
+        sigma=sigma,
+        sparse=True,
+        dtype=dtype_transforms,
+    )
+
+    scale = 1.1
+
+    vertices, faces = torchhull.visual_hull(
+        masks=masks,
+        transforms=transforms,
+        level=level,
+        cube_corner_bfl=(-scale, -scale, -scale),
+        cube_length=2.0 * scale,
+        masks_partial=masks_partial,
+        unique_verts=unique_verts,
+    )
+
+    assert torch.all(vertices >= torch.tensor([[-scale, -scale, -scale]], dtype=vertices.dtype, device=vertices.device))
+    assert torch.all(vertices <= torch.tensor([[scale, scale, scale]], dtype=vertices.dtype, device=vertices.device))
+    if unique_verts:
+        assert is_closed_manifold(faces)
+    else:
+        assert vertices.size(0) == 3 * faces.size(0)
+
+
+@pytest.mark.parametrize("level", list_levels())
+@pytest.mark.parametrize("masks_partial", [True, False])
+@pytest.mark.parametrize("unique_verts", [True, False])
+@pytest.mark.parametrize(
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float32, torch.float64]
+)
+@pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
 def test_visual_hull_with_candidate_voxels(
     level: int,
     masks_partial: bool,

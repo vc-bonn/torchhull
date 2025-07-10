@@ -1,5 +1,6 @@
 #include <torch/python.h>
 
+#include <torchhull/gaussian_blur.h>
 #include <torchhull/io.h>
 #include <torchhull/marching_cubes.h>
 #include <torchhull/visual_hull.h>
@@ -201,6 +202,43 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         -------
         verts: The vertex tensor of the extracted scene. \|V\| x 3. float32.
         faces: The face tensor of the extracted scene. \|F\| x 3. int64.
+    )");
+
+    m.def("gaussian_blur",
+          &torchhull::gaussian_blur,
+          "images"_a,
+          "kernel_size"_a,
+          "sigma"_a,
+          "sparse"_a = true,
+          "dtype"_a = py::none(),
+          R"(
+        Blurs the given images with a Gaussian kernel.
+
+        Note
+        ----
+            Not differentiable.
+
+        Note
+        ----
+            CUDA backend only.
+
+        Parameters
+        ----------
+        images
+            The image tensor. B x H x W x C.
+        kernel_size
+            The size of the kernel. Must be an odd number.
+        sigma
+            The standard deviation of the kernel.
+        sparse
+            Whether to use the sparse implementation optimized for masks or the standard dense version.
+        dtype
+            Optional dtype of the returned tensor. If set to `None`, the dtype of the input images is selected.
+            Must be a floating-point type.
+
+        Returns
+        -------
+        Blurred images. B x H x W x C.
     )");
 
     m.def("store_curve_network",
