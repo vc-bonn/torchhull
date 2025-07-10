@@ -37,7 +37,7 @@ def list_levels() -> list[int]:
 @pytest.mark.parametrize("masks_partial", [True, False])
 @pytest.mark.parametrize("unique_verts", [True, False])
 @pytest.mark.parametrize(
-    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float32, torch.float64]
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
 )
 @pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
 def test_visual_hull_empty_masks(
@@ -78,7 +78,7 @@ def test_visual_hull_empty_masks(
 @pytest.mark.parametrize("masks_partial", [True, False])
 @pytest.mark.parametrize("unique_verts", [True, False])
 @pytest.mark.parametrize(
-    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float32, torch.float64]
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
 )
 @pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
 def test_visual_hull_full_masks(
@@ -119,7 +119,7 @@ def test_visual_hull_full_masks(
 @pytest.mark.parametrize("masks_partial", [True, False])
 @pytest.mark.parametrize("unique_verts", [True, False])
 @pytest.mark.parametrize(
-    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float32, torch.float64]
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
 )
 @pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
 def test_visual_hull(
@@ -162,7 +162,7 @@ def test_visual_hull(
 @pytest.mark.parametrize("masks_partial", [True, False])
 @pytest.mark.parametrize("unique_verts", [True, False])
 @pytest.mark.parametrize(
-    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float32, torch.float64]
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
 )
 @pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
 def test_visual_hull_with_candidate_voxels(
