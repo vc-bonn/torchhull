@@ -32,6 +32,7 @@ torchhull is an extremely fast Torch C++/CUDA implementation for computing visua
 - ⚡ Up to real-time capable speed depending on chosen resolution
 - 🗜️ Memory-efficient computation by constructing sparse voxel octrees
 - 🌊 Watertight mesh generation via Marching Cubes
+- 🎈 Smooth surfaces with sparse Gaussian blur preprocessing tailored for mask images
 - 🛠️ Support for partially visible objects, i.e. clipped mask images, and fully observed objects
 
 
@@ -76,6 +77,13 @@ The visual hull is then evaluated inside a cube with bottom-front-left corner `c
 
 ```python
 import torchhull
+
+# Optional
+masks = torchhull.gaussian_blur(masks, # [B, H, W, 1]
+                                kernel_size,
+                                sigma,
+                                sparse=True,
+                               )
 
 verts, faces = torchhull.visual_hull(masks,  # [B, H, W, 1]
                                      transforms,  # [B, 4, 4]

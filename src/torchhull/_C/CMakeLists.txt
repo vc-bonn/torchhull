@@ -66,13 +66,16 @@ if(charonload_FOUND)
     charonload_add_torch_library(torchhull_cpp STATIC)
     add_library(torchhull::torchhull_cpp ALIAS torchhull_cpp)
 
-    target_sources(torchhull_cpp PRIVATE src/io.cpp
+    target_sources(torchhull_cpp PRIVATE src/gaussian_blur_cuda.cu
+                                         src/gaussian_blur.cpp
+                                         src/io.cpp
                                          src/marching_cubes_cuda.cu
                                          src/marching_cubes.cpp
                                          src/visual_hull_cuda.cu
                                          src/visual_hull.cpp)
 
     target_include_directories(torchhull_cpp PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+    target_compile_definitions(torchhull_cpp PRIVATE "__CUDA_NO_HALF_OPERATORS__")
     target_compile_features(torchhull_cpp PUBLIC cxx_std_17)
     target_compile_options(torchhull_cpp PRIVATE ${HOST_DEVICE_FLAGS})
     target_link_libraries(torchhull_cpp PRIVATE glm::glm stdgpu::stdgpu)

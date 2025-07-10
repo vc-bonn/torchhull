@@ -48,6 +48,7 @@ charonload.module_config["_c_torchhull"] = charonload.Config(
 
 from _c_torchhull import (
     candidate_voxels_to_wireframes,
+    gaussian_blur,
     marching_cubes,
     sparse_visual_hull_field,
     store_curve_network,
@@ -66,6 +67,7 @@ __copyright__ = f"2024, {__author__}"
 
 __all__ = [
     "candidate_voxels_to_wireframes",
+    "gaussian_blur",
     "marching_cubes",
     "sparse_visual_hull_field",
     "store_curve_network",
