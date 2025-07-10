@@ -46,7 +46,7 @@ visual_hull_cuda(const torch::Tensor& masks,
                                                               cube_length,
                                                               masks_partial);
 
-    auto isolevel = static_cast<float>(masks.size(0)) - 0.5f;
+    auto isolevel = 0.5f;
     auto mesh = marching_cubes_cuda_sparse(volume, isolevel, false, unique_verts);
 
     to_global_coordinates_and_flip_faces_(mesh, cube_corner_bfl, cube_length, glm::i64vec3{ 1 << level });
@@ -87,7 +87,7 @@ visual_hull_cuda_with_candidate_voxels_cuda(const torch::Tensor& masks,
                                                                               cube_length,
                                                                               masks_partial);
 
-    auto isolevel = static_cast<float>(masks.size(0)) - 0.5f;
+    auto isolevel = 0.5f;
     auto mesh = marching_cubes_cuda_sparse(volume, isolevel, false, unique_verts);
 
     to_global_coordinates_and_flip_faces_(mesh, cube_corner_bfl, cube_length, glm::i64vec3{ 1 << level });

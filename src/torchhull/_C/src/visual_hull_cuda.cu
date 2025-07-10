@@ -417,7 +417,7 @@ accumulate_hull_counts_full(const torch::PackedTensorAccessor64<int64_t, 1, torc
 
         auto g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
 
-        sparse_values[tid] += sample_bilinear_mode_zeros_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
+        sparse_values[tid] *= sample_bilinear_mode_zeros_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
     }
 }
 
@@ -457,7 +457,7 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
 
         auto g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
 
-        sparse_values[tid] += sample_bilinear_mode_ones_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
+        sparse_values[tid] *= sample_bilinear_mode_ones_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
     }
 }
 
@@ -711,7 +711,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
     all_corners = torch::Tensor{};
 
     // 3. Compute sparse hull counts
-    auto sparse_values = torch::zeros({ N }, dtype_float);
+    auto sparse_values = torch::ones({ N }, dtype_float);
 
     auto sparse_indices_ = sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>();
     auto sparse_values_ = sparse_values.packed_accessor64<float, 1, torch::RestrictPtrTraits>();
