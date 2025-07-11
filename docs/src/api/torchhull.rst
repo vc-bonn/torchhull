@@ -10,6 +10,7 @@
     :hidden:
 
     torchhull/candidate_voxels_to_wireframes
+    torchhull/gaussian_blur
     torchhull/marching_cubes
     torchhull/sparse_visual_hull_field
     torchhull/store_curve_network
