@@ -215,26 +215,25 @@ classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
 
                 auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
 
-                bb_min.x = fminf(bb_min.x, v_camera_ndc.x);
-                bb_min.y = fminf(bb_min.y, v_camera_ndc.y);
-                bb_max.x = fmaxf(bb_max.x, v_camera_ndc.x);
-                bb_max.y = fmaxf(bb_max.y, v_camera_ndc.y);
+                auto v_pixel =
+                        glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W), unnormalize_ndc_false(v_camera_ndc.y, H) };
+
+                bb_min.x = fminf(bb_min.x, v_pixel.x);
+                bb_min.y = fminf(bb_min.y, v_pixel.y);
+                bb_max.x = fmaxf(bb_max.x, v_pixel.x);
+                bb_max.y = fmaxf(bb_max.y, v_pixel.y);
             }
 
             const auto ROUND_DOWN = -0.5f;
             const auto ROUND_UP = 0.5f;
 
-            auto bb_min_unnormalized =
-                    glm::vec2{ unnormalize_ndc_false(bb_min.x, W), unnormalize_ndc_false(bb_min.y, H) };
-            auto bb_max_unnormalized =
-                    glm::vec2{ unnormalize_ndc_false(bb_max.x, W), unnormalize_ndc_false(bb_max.y, H) };
+            auto bb_min_rounded = glm::i64vec2{ roundf(bb_min.x + ROUND_DOWN), roundf(bb_min.y + ROUND_DOWN) };
+            auto bb_max_rounded = glm::i64vec2{ roundf(bb_max.x + ROUND_UP), roundf(bb_max.y + ROUND_UP) };
 
-            auto bb_min_border =
-                    glm::i64vec2{ glm::clamp<int64_t>(roundf(bb_min_unnormalized.x + ROUND_DOWN), 0, W - 1),
-                                  glm::clamp<int64_t>(roundf(bb_min_unnormalized.y + ROUND_DOWN), 0, H - 1) };
-            auto bb_max_border =
-                    glm::i64vec2{ glm::clamp<int64_t>(roundf(bb_max_unnormalized.x + ROUND_UP), 0, W - 1),
-                                  glm::clamp<int64_t>(roundf(bb_max_unnormalized.y + ROUND_UP), 0, H - 1) };
+            auto bb_min_border = glm::i64vec2{ glm::clamp<int64_t>(bb_min_rounded.x, 0, W - 1),
+                                               glm::clamp<int64_t>(bb_min_rounded.y, 0, H - 1) };
+            auto bb_max_border = glm::i64vec2{ glm::clamp<int64_t>(bb_max_rounded.x, 0, W - 1),
+                                               glm::clamp<int64_t>(bb_max_rounded.y, 0, H - 1) };
 
             auto area_bb = (bb_max_border.y - bb_min_border.y + 1) * (bb_max_border.x - bb_min_border.x + 1);
 
@@ -258,8 +257,7 @@ classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
             const auto isolevel = 0.5f;
             const float margin_isosurface = isolevel - epsilon;
 
-            if (integral_bb <= 0.f + margin_isosurface ||
-                (bb_min.x >= 1.f || bb_max.x <= -1.f || bb_min.y >= 1.f || bb_max.y <= -1.f))
+            if (integral_bb <= 0.f + margin_isosurface)
             {
                 is_empty = true;
             }
@@ -308,11 +306,13 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
         auto is_empty = false;
         [[maybe_unused]] auto is_object = false;
         auto should_refine = false;
-        bool corner_inside[8] = { false, false, false, false, false, false, false, false };
+        // For partial masks, we assume an overlap at the boundaries so all voxels fully lie within at least one image
+        auto fully_inside_one_frame = false;
         for (auto batch = int64_t{ 0 }; batch < integral_masks.size(0); ++batch)
         {
             auto bb_min = glm::vec2{ FLT_MAX, FLT_MAX };
             auto bb_max = glm::vec2{ -FLT_MAX, -FLT_MAX };
+            auto fully_inside = true;
             for (auto i = 0; i < 8; ++i)
             {
                 auto v = cube_vertex(g_child, i);
@@ -329,29 +329,25 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
 
                 auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
 
-                if (v_camera_ndc.x >= -1.f && v_camera_ndc.x <= 1.f && v_camera_ndc.y >= -1.f && v_camera_ndc.y <= 1.f)
-                {
-                    corner_inside[i] = true;
-                }
+                auto v_pixel =
+                        glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W), unnormalize_ndc_false(v_camera_ndc.y, H) };
 
-                bb_min.x = fminf(bb_min.x, v_camera_ndc.x);
-                bb_min.y = fminf(bb_min.y, v_camera_ndc.y);
-                bb_max.x = fmaxf(bb_max.x, v_camera_ndc.x);
-                bb_max.y = fmaxf(bb_max.y, v_camera_ndc.y);
+                bb_min.x = fminf(bb_min.x, v_pixel.x);
+                bb_min.y = fminf(bb_min.y, v_pixel.y);
+                bb_max.x = fmaxf(bb_max.x, v_pixel.x);
+                bb_max.y = fmaxf(bb_max.y, v_pixel.y);
+
+                if (!in_image(v_pixel.y, v_pixel.x, H, W, 1))
+                {
+                    fully_inside = false;
+                }
             }
 
             const auto ROUND_DOWN = -0.5f;
             const auto ROUND_UP = 0.5f;
 
-            auto bb_min_unnormalized =
-                    glm::vec2{ unnormalize_ndc_false(bb_min.x, W), unnormalize_ndc_false(bb_min.y, H) };
-            auto bb_max_unnormalized =
-                    glm::vec2{ unnormalize_ndc_false(bb_max.x, W), unnormalize_ndc_false(bb_max.y, H) };
-
-            auto bb_min_rounded = glm::i64vec2{ roundf(bb_min_unnormalized.x + ROUND_DOWN),
-                                                roundf(bb_min_unnormalized.y + ROUND_DOWN) };
-            auto bb_max_rounded =
-                    glm::i64vec2{ roundf(bb_max_unnormalized.x + ROUND_UP), roundf(bb_max_unnormalized.y + ROUND_UP) };
+            auto bb_min_rounded = glm::i64vec2{ roundf(bb_min.x + ROUND_DOWN), roundf(bb_min.y + ROUND_DOWN) };
+            auto bb_max_rounded = glm::i64vec2{ roundf(bb_max.x + ROUND_UP), roundf(bb_max.y + ROUND_UP) };
 
             auto bb_min_border = glm::i64vec2{ glm::clamp<int64_t>(bb_min_rounded.x, 0, W - 1),
                                                glm::clamp<int64_t>(bb_min_rounded.y, 0, H - 1) };
@@ -370,7 +366,6 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
             auto integral_mask_11 = sample_zeros_padding(integral_masks, bb_max_border.y, bb_max_border.x, batch, 0);
 
             auto integral_bb = integral_mask_11 + integral_mask_00 - integral_mask_10 - integral_mask_01;
-            auto full_integral_bb = full_area_bb - area_bb + integral_bb;
 
             // NOTE: Due to the large range of sizes, numerical errors may quickly build up
             const auto epsilon = 1e-1f;
@@ -378,14 +373,11 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
             CUDA_DEVICE_CHECK(integral_bb >= 0.f - epsilon);
             CUDA_DEVICE_CHECK(integral_bb <= static_cast<float>(area_bb) + epsilon);
 
-            CUDA_DEVICE_CHECK(full_integral_bb >= 0.f - epsilon);
-            CUDA_DEVICE_CHECK(full_integral_bb <= static_cast<float>(full_area_bb) + epsilon);
-
             // Take the (image) isolevel into account when evaluating the accumulated mask values
             const auto isolevel = 0.5f;
             const float margin_isosurface = isolevel - epsilon;
 
-            if (full_integral_bb <= 0.f + margin_isosurface)
+            if (integral_bb <= 0.f + margin_isosurface && area_bb == full_area_bb)
             {
                 is_empty = true;
             }
@@ -393,19 +385,15 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
             {
                 is_object = true;
             }
-            else
+            else if (bb_max_border.y - bb_min_border.y > 1 && bb_max_border.x - bb_min_border.x > 1)
             {
                 should_refine = true;
             }
+
+            fully_inside_one_frame |= fully_inside;
         }
 
-        bool voxel_inside = true;
-        for (auto i = 0; i < 8; ++i)
-        {
-            voxel_inside &= corner_inside[i];
-        }
-
-        occupied_voxel[tid] = (should_refine && !is_empty && (!last_children || voxel_inside));
+        occupied_voxel[tid] = (should_refine && !is_empty && (!last_children || fully_inside_one_frame));
     }
 }
 
@@ -485,7 +473,12 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
 
         auto g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
 
-        sparse_values[tid] *= sample_bilinear_mode_ones_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
+        // For partial masks, only accumulate valid values (no interpolation across the boundary)
+        auto g_pixel_rounded = glm::i64vec2{ roundf(g_pixel.x), roundf(g_pixel.y) };
+        if (in_image(g_pixel_rounded.y, g_pixel_rounded.x, H, W, 1))
+        {
+            sparse_values[tid] *= sample_bilinear_mode_ones_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
+        }
     }
 }
 

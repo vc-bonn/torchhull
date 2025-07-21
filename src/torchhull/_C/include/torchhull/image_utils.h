@@ -54,12 +54,16 @@ ravel_multi_index(const glm::i64vec3& multi_index, const glm::i64vec3& shape)
 }
 
 inline C10_HOST_DEVICE bool
-in_image(const int64_t y, const int64_t x, const int64_t height, const int64_t width)
+in_image(const int64_t y, const int64_t x, const int64_t height, const int64_t width, const int64_t margin = 0)
 {
-    return 0 <= y && y < height && 0 <= x && x < width;
+    return 0 + margin <= y && y < height - margin && 0 + margin <= x && x < width - margin;
 }
 
+// NOTE
+// ----
 // false refers to torch.nn.functional.grid_sample()'s align_corners=false
+//
+// A pixel with integer coordinates (y, x) covers the area inside [y - 0.5, y + 0.5] and [x - 0.5, x + 0.5].
 inline C10_HOST_DEVICE float
 unnormalize_ndc_false(const float coordinate, const int64_t size)
 {
