@@ -42,7 +42,7 @@ def test_gaussian_blur(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks = generate_dataset(
+    _, _, masks, _, _, _ = generate_dataset(
         mesh_file=data_dir / file,
         number_cameras=number_cameras,
         device=DEVICE,

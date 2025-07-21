@@ -30,6 +30,26 @@ def perspective(
     )
 
 
+def perspective_cv(
+    fovy: float,
+    aspect: float,
+    height: int,
+    width: int,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    return torch.tensor(
+        [
+            [(width / 2.0) / (np.tan(fovy / 2.0) * aspect), 0.0, width / 2.0, 0.0],
+            [0.0, (height / 2.0) / np.tan(fovy / 2.0), height / 2.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=dtype,
+        device=device,
+    )
+
+
 def rotate(
     angle: float,
     x: float,
@@ -77,6 +97,7 @@ def generate_random_camera(
     device: torch.device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     projection_matrix = perspective(fovy, width / height, near, far, dtype, device)
+    projection_matrix_cv = perspective_cv(fovy, width / height, height, width, dtype, device)
 
     random_axis = scipy.stats.uniform_direction.rvs(3)
     rng = np.random.default_rng(1337)
@@ -87,8 +108,13 @@ def generate_random_camera(
     random_t = translate(random_translate[0], random_translate[1], random_translate[2], dtype, device)
 
     view_matrix = translate(0, 0, -camera_origin_distance, dtype, device) @ random_t @ random_r
+    view_matrix_cv = (
+        torch.tensor([1, -1, -1, 1], dtype=dtype, device=device).diag()
+        @ view_matrix
+        @ torch.tensor([1, -1, -1, 1], dtype=dtype, device=device).diag()
+    )
 
-    return projection_matrix, view_matrix
+    return projection_matrix, view_matrix, projection_matrix_cv, view_matrix_cv
 
 
 def render_masks(
@@ -180,8 +206,15 @@ def generate_dataset(
 
     projection_matrices = torch.empty([number_cameras, 4, 4], dtype=dtype, device=device)
     view_matrices = torch.empty([number_cameras, 4, 4], dtype=dtype, device=device)
+    projection_matrices_cv = torch.empty([number_cameras, 4, 4], dtype=dtype, device=device)
+    view_matrices_cv = torch.empty([number_cameras, 4, 4], dtype=dtype, device=device)
     for i in range(number_cameras):
-        projection_matrices[i, :, :], view_matrices[i, :, :] = generate_random_camera(
+        (
+            projection_matrices[i, :, :],
+            view_matrices[i, :, :],
+            projection_matrices_cv[i, :, :],
+            view_matrices_cv[i, :, :],
+        ) = generate_random_camera(
             fovy,
             near,
             far,
@@ -204,7 +237,7 @@ def generate_dataset(
         device=device,
     )
 
-    return projection_matrices, view_matrices, masks
+    return projection_matrices, view_matrices, masks, projection_matrices_cv, view_matrices_cv, masks.flip((1,))
 
 
 def main() -> None:
@@ -215,7 +248,7 @@ def main() -> None:
 
     output_dir.mkdir(exist_ok=True)
 
-    projection_matrices, view_matrices, masks = generate_dataset(
+    projection_matrices, view_matrices, masks, _, _, _ = generate_dataset(
         mesh_file=data_dir / file,
         dtype=torch.float32,
         device=torch.device("cuda"),

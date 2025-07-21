@@ -71,7 +71,7 @@ pip install torchhull
 torchhull gets as input mask images with camera information:
 
 - `masks`: Single-channel images `M` with binary values {0, 1}.
-- `transforms`: Fused extrinsic and intrinsic matrix `K * T`, i.e. transformation from world coordinates to OpenGL clip space (right before perspective division).
+- `transforms`: Fused extrinsic and intrinsic matrix `K * T`, i.e. from world coordinates to image coordinates (right before perspective division), either in OpenGL or OpenCV convention.
 
 The visual hull is then evaluated inside a cube with bottom-front-left corner `cube_corner_bfl` and extent `cube_length` at extracted at octree level `level`. The remaining flags control how the output mesh `(verts, faces)` should look like.
 
@@ -91,6 +91,7 @@ verts, faces = torchhull.visual_hull(masks,  # [B, H, W, 1]
                                      cube_corner_bfl,
                                      cube_length,
                                      masks_partial=False,
+                                     transforms_convention="opengl",
                                      unique_verts=True,
                                     )
 ```

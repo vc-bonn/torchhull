@@ -17,6 +17,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
           "cube_corner_bfl"_a,
           "cube_length"_a,
           "masks_partial"_a,
+          "transforms_convention"_a,
           "unique_verts"_a = true,
           R"(
         Compute the visual hull of the given masks in terms of a mesh.
@@ -34,7 +35,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         masks
             Single-channel mask images with binary values {0, 1}. B x H x W x 1.
         transforms
-            The combined transformations from world coordinates to OpenGL clip space (right before perspective division). B x 4 x 4.
+            The combined transformations, i.e. intrinsics * extrinsics, from world coordinates to image coordinates (right before perspective division). B x 4 x 4.
         level
             The hierarchy level to compute the visual hull at.
         cube_corner_bfl
@@ -43,6 +44,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
             The length of the cube in world space.
         masks_partial
             Whether some masks may only contain the object partially.
+        transforms_convention
+            Convention used to specify the transformations. Options: `opengl`, `opencv`.
         unique_verts
             Whether a compact mesh without duplicate vertices (\|F\| approx. 2 * \|V\|) if true, or a triangle soup
             (\|F\| = (1/3) * \|V\|) if false should be returned.
@@ -61,6 +64,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
           "cube_corner_bfl"_a,
           "cube_length"_a,
           "masks_partial"_a,
+          "transforms_convention"_a,
           "unique_verts"_a = true,
           R"(
         Compute the visual hull of the given masks in terms of a mesh.
@@ -78,7 +82,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         masks
             Single-channel mask images with binary values {0, 1}. B x H x W x 1.
         transforms
-            The combined transformations from world coordinates to OpenGL clip space (right before perspective division). B x 4 x 4.
+            The combined transformations, i.e. intrinsics * extrinsics, from world coordinates to image coordinates (right before perspective division). B x 4 x 4.
         level
             The hierarchy level to compute the visual hull at.
         cube_corner_bfl
@@ -87,6 +91,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
             The length of the cube in world space.
         masks_partial
             Whether some masks may only contain the object partially.
+        transforms_convention
+            Convention used to specify the transformations. Options: `opengl`, `opencv`.
         unique_verts
             Whether a compact mesh without duplicate vertices (\|F\| approx. 2 * \|V\|) if true, or a triangle soup
             (\|F\| = (1/3) * \|V\|) if false should be returned.
@@ -136,6 +142,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
           "cube_corner_bfl"_a,
           "cube_length"_a,
           "masks_partial"_a,
+          "transforms_convention"_a,
           R"(
         Compute a sparse scalar field of the sum of projected foreground pixels per detected candidate voxel. In this
         field, the visual hull is located at isolevel \|M\| - 0.5.
@@ -153,7 +160,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
         masks
             Single-channel mask images with binary values {0, 1}. B x H x W x 1.
         transforms
-            The combined transformations from world coordinates to OpenGL clip space (right before perspective division). B x 4 x 4.
+            The combined transformations, i.e. intrinsics * extrinsics, from world coordinates to image coordinates (right before perspective division). B x 4 x 4.
         level
             The hierarchy level to compute the counts at.
         cube_corner_bfl
@@ -162,6 +169,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
             The length of the cube in world space.
         masks_partial
             Whether some masks may only contain the object partially.
+        transforms_convention
+            Convention used to specify the transformations. Options: `opengl`, `opencv`.
 
         Returns
         -------

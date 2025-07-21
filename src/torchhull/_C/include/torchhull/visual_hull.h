@@ -15,6 +15,7 @@ visual_hull(const torch::Tensor& masks,
             const std::array<float, 3>& cube_corner_bfl,
             const float cube_length,
             const bool masks_partial,
+            const std::string& transforms_convention,
             const bool unique_verts);
 
 std::tuple<torch::Tensor, torch::Tensor, std::vector<torch::Tensor>>
@@ -24,6 +25,7 @@ visual_hull_with_candidate_voxels(const torch::Tensor& masks,
                                   const std::array<float, 3>& cube_corner_bfl,
                                   const float cube_length,
                                   const bool masks_partial,
+                                  const std::string& transforms_convention,
                                   const bool unique_verts);
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor>>
@@ -37,6 +39,7 @@ sparse_visual_hull_field(const torch::Tensor& masks,
                          const int level,
                          const std::array<float, 3>& cube_corner_bfl,
                          const float cube_length,
-                         const bool masks_partial);
+                         const bool masks_partial,
+                         const std::string& transforms_convention);
 
 } // namespace torchhull
