@@ -834,17 +834,20 @@ sparse_visual_hull_field_cuda(const torch::Tensor& masks,
     auto sparse_indices_unraveled = torch::empty({ 4, N }, dtype_int64);
     auto sparse_indices = sparse_volume.indices();
 
-    const int threads_per_block = 128;
-    dim3 grid_corners;
-    at::cuda::getApplyGrid(N, grid_corners, masks.device().index(), threads_per_block);
-    dim3 threads = at::cuda::getApplyBlock(threads_per_block);
+    if (N != 0)
+    {
+        const int threads_per_block = 128;
+        dim3 grid_corners;
+        at::cuda::getApplyGrid(N, grid_corners, masks.device().index(), threads_per_block);
+        dim3 threads = at::cuda::getApplyBlock(threads_per_block);
 
-    extract_sparse_indices<<<grid_corners, threads, 0, stream>>>(
-            sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
-            resolution_cells,
-            sparse_indices_unraveled.packed_accessor64<int64_t, 2, torch::RestrictPtrTraits>());
-    AT_CUDA_CHECK(cudaGetLastError());
-    AT_CUDA_CHECK(cudaStreamSynchronize(stream));
+        extract_sparse_indices<<<grid_corners, threads, 0, stream>>>(
+                sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
+                resolution_cells,
+                sparse_indices_unraveled.packed_accessor64<int64_t, 2, torch::RestrictPtrTraits>());
+        AT_CUDA_CHECK(cudaGetLastError());
+        AT_CUDA_CHECK(cudaStreamSynchronize(stream));
+    }
 
     auto sparse_field =
             torch::sparse_coo_tensor(sparse_indices_unraveled,
