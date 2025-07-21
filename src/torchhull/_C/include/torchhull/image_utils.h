@@ -70,6 +70,17 @@ unnormalize_ndc_false(const float coordinate, const int64_t size)
     return (coordinate + 1.f) * static_cast<float>(size) / 2.f - 0.5f;
 }
 
+// NOTE
+// ----
+// false refers to torch.nn.functional.grid_sample()'s align_corners=false
+//
+// A pixel with integer coordinates (y, x) covers the area inside [y - 0.5, y + 0.5] and [x - 0.5, x + 0.5].
+inline C10_HOST_DEVICE float
+align_cv_false(const float coordinate)
+{
+    return coordinate - 0.5f;
+}
+
 template <typename ValueT>
 inline C10_DEVICE ValueT
 sample_zeros_padding(const torch::PackedTensorAccessor64<ValueT, 4, torch::RestrictPtrTraits> image,

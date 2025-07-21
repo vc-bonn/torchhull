@@ -50,7 +50,9 @@ def test_visual_hull_empty_masks(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks_reference = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    projection_matrices, view_matrices, masks_reference, _, _, _ = generate_dataset(
+        mesh_file=data_dir / file, device=DEVICE
+    )
     transforms = projection_matrices @ view_matrices
 
     masks_reference = masks_reference.to(dtype=dtype_masks, device=DEVICE)
@@ -67,6 +69,7 @@ def test_visual_hull_empty_masks(
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=masks_partial,
+        transforms_convention="opengl",
         unique_verts=unique_verts,
     )
 
@@ -91,7 +94,9 @@ def test_visual_hull_full_masks(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks_reference = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    projection_matrices, view_matrices, masks_reference, _, _, _ = generate_dataset(
+        mesh_file=data_dir / file, device=DEVICE
+    )
     transforms = projection_matrices @ view_matrices
 
     masks_reference = masks_reference.to(dtype=dtype_masks, device=DEVICE)
@@ -108,6 +113,7 @@ def test_visual_hull_full_masks(
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=masks_partial,
+        transforms_convention="opengl",
         unique_verts=unique_verts,
     )
 
@@ -132,7 +138,7 @@ def test_visual_hull(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    projection_matrices, view_matrices, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
     transforms = projection_matrices @ view_matrices
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
@@ -147,6 +153,7 @@ def test_visual_hull(
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=masks_partial,
+        transforms_convention="opengl",
         unique_verts=unique_verts,
     )
 
@@ -156,6 +163,90 @@ def test_visual_hull(
         assert is_closed_manifold(faces)
     else:
         assert vertices.size(0) == 3 * faces.size(0)
+
+
+@pytest.mark.parametrize("level", list(range(1, 5 + 1)))  # NN search is slow, so only test low levels
+@pytest.mark.parametrize("masks_partial", [True, False])
+@pytest.mark.parametrize("unique_verts", [True, False])
+@pytest.mark.parametrize(
+    "dtype_masks", [torch.int8, torch.int16, torch.int32, torch.int64, torch.float16, torch.float32, torch.float64]
+)
+@pytest.mark.parametrize("dtype_transforms", [torch.float32, torch.float64])
+def test_visual_hull_transforms_conventions(
+    level: int,
+    masks_partial: bool,
+    unique_verts: bool,
+    dtype_masks: torch.dtype,
+    dtype_transforms: torch.dtype,
+) -> None:
+    data_dir = pathlib.Path(__file__).parents[1] / "data"
+    file = "Armadillo.ply"
+
+    (
+        projection_matrices,
+        view_matrices,
+        masks,
+        projection_matrices_cv,
+        view_matrices_cv,
+        masks_cv,
+    ) = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    transforms = projection_matrices @ view_matrices
+    transforms_cv = projection_matrices_cv @ view_matrices_cv
+
+    masks = masks.to(dtype=dtype_masks, device=DEVICE)
+    transforms = transforms.to(dtype=dtype_transforms, device=DEVICE)
+
+    scale = 1.1
+
+    vertices, faces = torchhull.visual_hull(
+        masks=masks,
+        transforms=transforms,
+        level=level,
+        cube_corner_bfl=(-scale, -scale, -scale),
+        cube_length=2.0 * scale,
+        masks_partial=masks_partial,
+        transforms_convention="opengl",
+        unique_verts=unique_verts,
+    )
+
+    assert torch.all(vertices >= torch.tensor([[-scale, -scale, -scale]], dtype=vertices.dtype, device=vertices.device))
+    assert torch.all(vertices <= torch.tensor([[scale, scale, scale]], dtype=vertices.dtype, device=vertices.device))
+    if unique_verts:
+        assert is_closed_manifold(faces)
+    else:
+        assert vertices.size(0) == 3 * faces.size(0)
+
+    vertices_cv, faces_cv = torchhull.visual_hull(
+        masks=masks_cv,
+        transforms=transforms_cv,
+        level=level,
+        cube_corner_bfl=(-scale, -scale, -scale),
+        cube_length=2.0 * scale,
+        masks_partial=masks_partial,
+        transforms_convention="opencv",
+        unique_verts=unique_verts,
+    )
+    vertices_cv = (
+        torch.tensor([1, -1, -1], dtype=transforms_cv.dtype, device=transforms_cv.device).diag() @ vertices_cv.T
+    ).T  # CV -> GL
+
+    assert torch.all(
+        vertices_cv >= torch.tensor([[-scale, -scale, -scale]], dtype=vertices_cv.dtype, device=vertices_cv.device)
+    )
+    assert torch.all(
+        vertices_cv <= torch.tensor([[scale, scale, scale]], dtype=vertices_cv.dtype, device=vertices_cv.device)
+    )
+    if unique_verts:
+        assert is_closed_manifold(faces_cv)
+    else:
+        assert vertices_cv.size(0) == 3 * faces_cv.size(0)
+
+    # This is slow but memory-efficient
+    epsilon = 1e-4
+    for i in range(vertices.shape[0]):
+        nn_distances = torch.linalg.norm(vertices_cv - vertices[i : (i + 1)], dim=1)
+        nn = torch.topk(nn_distances, k=1, largest=False)
+        assert nn.values[0] < epsilon
 
 
 @pytest.mark.parametrize("level", list_levels())
@@ -175,7 +266,7 @@ def test_visual_hull_with_blur(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    projection_matrices, view_matrices, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
     transforms = projection_matrices @ view_matrices
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
@@ -200,6 +291,7 @@ def test_visual_hull_with_blur(
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=masks_partial,
+        transforms_convention="opengl",
         unique_verts=unique_verts,
     )
 
@@ -228,7 +320,7 @@ def test_visual_hull_with_candidate_voxels(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    projection_matrices, view_matrices, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
     transforms = projection_matrices @ view_matrices
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
@@ -243,6 +335,7 @@ def test_visual_hull_with_candidate_voxels(
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=masks_partial,
+        transforms_convention="opengl",
         unique_verts=unique_verts,
     )
 

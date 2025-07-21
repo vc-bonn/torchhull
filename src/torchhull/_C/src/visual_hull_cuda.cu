@@ -170,6 +170,7 @@ __global__ void
 classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> candidates,
                        const torch::PackedTensorAccessor64<float, 4, torch::RestrictPtrTraits> integral_masks,
                        const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
+                       const bool transforms_in_opengl,
                        const glm::i64vec3 resolution,
                        const glm::i64vec3 resolution_children,
                        const glm::vec3 cube_corner_bfl,
@@ -213,10 +214,18 @@ classify_children_full(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
 
                 auto v_camera = bmm_4x4_transforms(v_world, transforms, batch);
 
-                auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
-
-                auto v_pixel =
-                        glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W), unnormalize_ndc_false(v_camera_ndc.y, H) };
+                auto v_pixel = glm::vec2{};
+                if (transforms_in_opengl)
+                {
+                    auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
+                    v_pixel = glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W),
+                                         unnormalize_ndc_false(v_camera_ndc.y, H) };
+                }
+                else
+                {
+                    auto v_camera_cv = glm::vec2{ v_camera.x / v_camera.z, v_camera.y / v_camera.z };
+                    v_pixel = glm::vec2{ align_cv_false(v_camera_cv.x), align_cv_false(v_camera_cv.y) };
+                }
 
                 bb_min.x = fminf(bb_min.x, v_pixel.x);
                 bb_min.y = fminf(bb_min.y, v_pixel.y);
@@ -280,6 +289,7 @@ __global__ void
 classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> candidates,
                           const torch::PackedTensorAccessor64<float, 4, torch::RestrictPtrTraits> integral_masks,
                           const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
+                          const bool transforms_in_opengl,
                           const glm::i64vec3 resolution,
                           const glm::i64vec3 resolution_children,
                           const glm::vec3 cube_corner_bfl,
@@ -327,10 +337,18 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
 
                 auto v_camera = bmm_4x4_transforms(v_world, transforms, batch);
 
-                auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
-
-                auto v_pixel =
-                        glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W), unnormalize_ndc_false(v_camera_ndc.y, H) };
+                auto v_pixel = glm::vec2{};
+                if (transforms_in_opengl)
+                {
+                    auto v_camera_ndc = glm::vec2{ v_camera.x / v_camera.w, v_camera.y / v_camera.w };
+                    v_pixel = glm::vec2{ unnormalize_ndc_false(v_camera_ndc.x, W),
+                                         unnormalize_ndc_false(v_camera_ndc.y, H) };
+                }
+                else
+                {
+                    auto v_camera_cv = glm::vec2{ v_camera.x / v_camera.z, v_camera.y / v_camera.z };
+                    v_pixel = glm::vec2{ align_cv_false(v_camera_cv.x), align_cv_false(v_camera_cv.y) };
+                }
 
                 bb_min.x = fminf(bb_min.x, v_pixel.x);
                 bb_min.y = fminf(bb_min.y, v_pixel.y);
@@ -403,6 +421,7 @@ accumulate_hull_counts_full(const torch::PackedTensorAccessor64<int64_t, 1, torc
                             const int64_t N,
                             const torch::PackedTensorAccessor64<MaskT, 4, torch::RestrictPtrTraits> masks,
                             const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
+                            const bool transforms_in_opengl,
                             const glm::i64vec3 resolution_cells,
                             const glm::vec3 cube_corner_bfl,
                             const float cube_length,
@@ -429,9 +448,17 @@ accumulate_hull_counts_full(const torch::PackedTensorAccessor64<int64_t, 1, torc
 
         auto g_camera = bmm_4x4_transforms(g_world, transforms, batch);
 
-        auto g_camera_ndc = glm::vec2{ g_camera.x / g_camera.w, g_camera.y / g_camera.w };
-
-        auto g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
+        auto g_pixel = glm::vec2{};
+        if (transforms_in_opengl)
+        {
+            auto g_camera_ndc = glm::vec2{ g_camera.x / g_camera.w, g_camera.y / g_camera.w };
+            g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
+        }
+        else
+        {
+            auto g_camera_cv = glm::vec2{ g_camera.x / g_camera.z, g_camera.y / g_camera.z };
+            g_pixel = glm::vec2{ align_cv_false(g_camera_cv.x), align_cv_false(g_camera_cv.y) };
+        }
 
         sparse_values[tid] *= sample_bilinear_mode_zeros_padding(masks, g_pixel.y, g_pixel.x, batch, 0);
     }
@@ -443,6 +470,7 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
                                const int64_t N,
                                const torch::PackedTensorAccessor64<MaskT, 4, torch::RestrictPtrTraits> masks,
                                const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
+                               const bool transforms_in_opengl,
                                const glm::i64vec3 resolution_cells,
                                const glm::vec3 cube_corner_bfl,
                                const float cube_length,
@@ -469,9 +497,17 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
 
         auto g_camera = bmm_4x4_transforms(g_world, transforms, batch);
 
-        auto g_camera_ndc = glm::vec2{ g_camera.x / g_camera.w, g_camera.y / g_camera.w };
-
-        auto g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
+        auto g_pixel = glm::vec2{};
+        if (transforms_in_opengl)
+        {
+            auto g_camera_ndc = glm::vec2{ g_camera.x / g_camera.w, g_camera.y / g_camera.w };
+            g_pixel = glm::vec2{ unnormalize_ndc_false(g_camera_ndc.x, W), unnormalize_ndc_false(g_camera_ndc.y, H) };
+        }
+        else
+        {
+            auto g_camera_cv = glm::vec2{ g_camera.x / g_camera.z, g_camera.y / g_camera.z };
+            g_pixel = glm::vec2{ align_cv_false(g_camera_cv.x), align_cv_false(g_camera_cv.y) };
+        }
 
         // For partial masks, only accumulate valid values (no interpolation across the boundary)
         auto g_pixel_rounded = glm::i64vec2{ roundf(g_pixel.x), roundf(g_pixel.y) };
@@ -510,7 +546,8 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                                        const int level,
                                        const std::array<float, 3>& cube_corner_bfl,
                                        const float cube_length,
-                                       const bool masks_partial)
+                                       const bool masks_partial,
+                                       const std::string& transforms_convention)
 {
     TORCH_CHECK_EQ(masks.device(), transforms.device());
     TORCH_CHECK_EQ(masks.dim(), 4);
@@ -521,6 +558,20 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
     TORCH_CHECK_EQ(masks.size(3), 1);
     TORCH_CHECK_GE(level, 0);
     TORCH_CHECK_GT(cube_length, 0.f);
+
+    auto transforms_in_opengl = bool{};
+    if (transforms_convention == "opengl")
+    {
+        transforms_in_opengl = true;
+    }
+    else if (transforms_convention == "opencv")
+    {
+        transforms_in_opengl = false;
+    }
+    else
+    {
+        TORCH_CHECK(false, "Unsupported transforms_convention \"" + transforms_convention + "\".");
+    }
 
     at::cuda::CUDAGuard device_guard{ masks.device() };
     const auto stream = at::cuda::getCurrentCUDAStream();
@@ -569,6 +620,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                         classify_children_partial<<<grid_volume, threads, 0, stream>>>(candidates_,
                                                                                        integral_masks_,
                                                                                        transforms_,
+                                                                                       transforms_in_opengl,
                                                                                        resolution,
                                                                                        resolution_children,
                                                                                        cube_corner_bfl_cuda,
@@ -583,6 +635,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                         classify_children_full<<<grid_volume, threads, 0, stream>>>(candidates_,
                                                                                     integral_masks_,
                                                                                     transforms_,
+                                                                                    transforms_in_opengl,
                                                                                     resolution,
                                                                                     resolution_children,
                                                                                     cube_corner_bfl_cuda,
@@ -765,6 +818,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                                             N,
                                             masks_,
                                             transforms_,
+                                            transforms_in_opengl,
                                             resolution_cells,
                                             cube_corner_bfl_cuda,
                                             cube_length,
@@ -780,6 +834,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                                             N,
                                             masks_,
                                             transforms_,
+                                            transforms_in_opengl,
                                             resolution_cells,
                                             cube_corner_bfl_cuda,
                                             cube_length,
@@ -804,14 +859,16 @@ sparse_visual_hull_field_cuda(const torch::Tensor& masks,
                               const int level,
                               const std::array<float, 3>& cube_corner_bfl,
                               const float cube_length,
-                              const bool masks_partial)
+                              const bool masks_partial,
+                              const std::string& transforms_convention)
 {
     auto [sparse_volume, _] = sparse_visual_hull_field_cuda_ravelled(masks,
                                                                      transforms,
                                                                      level,
                                                                      cube_corner_bfl,
                                                                      cube_length,
-                                                                     masks_partial);
+                                                                     masks_partial,
+                                                                     transforms_convention);
 
     at::cuda::CUDAGuard device_guard{ masks.device() };
     const auto stream = at::cuda::getCurrentCUDAStream();

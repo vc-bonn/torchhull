@@ -27,7 +27,7 @@ def test_visual_hull(benchmark, level: int, number_cameras: int) -> None:  # noq
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    projection_matrices, view_matrices, masks = generate_dataset(
+    projection_matrices, view_matrices, masks, _, _, _ = generate_dataset(
         mesh_file=data_dir / file,
         number_cameras=number_cameras,
         device=DEVICE,
@@ -47,6 +47,7 @@ def test_visual_hull(benchmark, level: int, number_cameras: int) -> None:  # noq
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=False,
+        transforms_convention="opengl",
         unique_verts=True,
     )
 
@@ -58,5 +59,6 @@ def test_visual_hull(benchmark, level: int, number_cameras: int) -> None:  # noq
         cube_corner_bfl=(-scale, -scale, -scale),
         cube_length=2.0 * scale,
         masks_partial=False,
+        transforms_convention="opengl",
         unique_verts=True,
     )

@@ -32,7 +32,7 @@ def test_gaussian_blur_empty_masks(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks_reference = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks_reference, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks_reference = masks_reference.to(dtype=dtype_masks, device=DEVICE)
     masks = torch.zeros_like(masks_reference)
@@ -65,7 +65,7 @@ def test_gaussian_blur_full_masks(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks_reference = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks_reference, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks_reference = masks_reference.to(dtype=dtype_masks, device=DEVICE)
     masks = torch.ones_like(masks_reference)
@@ -98,7 +98,7 @@ def test_gaussian_blur_kernel_size_1(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
 
@@ -132,7 +132,7 @@ def test_gaussian_blur_default_type(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
 
@@ -171,7 +171,7 @@ def test_gaussian_blur(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
 
@@ -209,7 +209,7 @@ def test_gaussian_blur_consistent(
     data_dir = pathlib.Path(__file__).parents[1] / "data"
     file = "Armadillo.ply"
 
-    _, _, masks = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
+    _, _, masks, _, _, _ = generate_dataset(mesh_file=data_dir / file, device=DEVICE)
 
     masks = masks.to(dtype=dtype_masks, device=DEVICE)
 
