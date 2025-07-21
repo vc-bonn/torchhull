@@ -355,7 +355,8 @@ classify_children_partial(const torch::PackedTensorAccessor64<int64_t, 1, torch:
                 bb_max.x = fmaxf(bb_max.x, v_pixel.x);
                 bb_max.y = fmaxf(bb_max.y, v_pixel.y);
 
-                if (!in_image(v_pixel.y, v_pixel.x, H, W, 1))
+                auto v_pixel_rounded = glm::i64vec2{ roundf(v_pixel.x), roundf(v_pixel.y) };
+                if (!in_image(v_pixel_rounded.y, v_pixel_rounded.x, H, W, 1))
                 {
                     fully_inside = false;
                 }
