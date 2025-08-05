@@ -423,13 +423,13 @@ accumulate_hull_counts_full(const torch::PackedTensorAccessor64<int64_t, 1, torc
                             const torch::PackedTensorAccessor64<MaskT, 4, torch::RestrictPtrTraits> masks,
                             const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
                             const bool transforms_in_opengl,
-                            const glm::i64vec3 resolution_cells,
+                            const glm::i64vec3 resolution_grid,
                             const glm::vec3 cube_corner_bfl,
                             const float cube_length,
                             const int64_t batch,
                             torch::PackedTensorAccessor64<float, 1, torch::RestrictPtrTraits> sparse_values)
 {
-    const auto resolution_grid = glm::i64vec3{ resolution_cells.x + 1, resolution_cells.y + 1, resolution_cells.z + 1 };
+    const auto resolution_cells = glm::i64vec3{ resolution_grid.x - 1, resolution_grid.y - 1, resolution_grid.z - 1 };
 
     // Note: image has dims (N, H, W, C) instead of (N, C, H, W)
     const auto H = masks.size(1);
@@ -472,13 +472,13 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
                                const torch::PackedTensorAccessor64<MaskT, 4, torch::RestrictPtrTraits> masks,
                                const torch::PackedTensorAccessor64<TransformT, 3, torch::RestrictPtrTraits> transforms,
                                const bool transforms_in_opengl,
-                               const glm::i64vec3 resolution_cells,
+                               const glm::i64vec3 resolution_grid,
                                const glm::vec3 cube_corner_bfl,
                                const float cube_length,
                                const int64_t batch,
                                torch::PackedTensorAccessor64<float, 1, torch::RestrictPtrTraits> sparse_values)
 {
-    const auto resolution_grid = glm::i64vec3{ resolution_cells.x + 1, resolution_cells.y + 1, resolution_cells.z + 1 };
+    const auto resolution_cells = glm::i64vec3{ resolution_grid.x - 1, resolution_grid.y - 1, resolution_grid.z - 1 };
 
     // Note: image has dims (N, H, W, C) instead of (N, C, H, W)
     const auto H = masks.size(1);
@@ -521,11 +521,10 @@ accumulate_hull_counts_partial(const torch::PackedTensorAccessor64<int64_t, 1, t
 
 __global__ void
 extract_sparse_indices(const torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> sparse_indices,
-                       const glm::i64vec3 resolution_cells,
+                       const glm::i64vec3 resolution_grid,
                        torch::PackedTensorAccessor64<int64_t, 2, torch::RestrictPtrTraits> sparse_indices_unraveled)
 {
     const auto N = sparse_indices.size(0);
-    const auto resolution_grid = resolution_cells + int64_t{ 1 };
 
     auto id = static_cast<int64_t>(blockIdx.x) * static_cast<int64_t>(blockDim.x) + static_cast<int64_t>(threadIdx.x);
     auto num_threads = static_cast<int64_t>(gridDim.x) * static_cast<int64_t>(blockDim.x);
@@ -539,6 +538,45 @@ extract_sparse_indices(const torch::PackedTensorAccessor64<int64_t, 1, torch::Re
         sparse_indices_unraveled[2][tid] = g.y;
         sparse_indices_unraveled[3][tid] = g.x;
     }
+}
+
+torch::Tensor
+to_sparse_coo_tensor(const RavelledSparseTensor& ravelled_tensor)
+{
+    auto sparse_indices = ravelled_tensor.indices();
+
+    at::cuda::CUDAGuard device_guard{ sparse_indices.device() };
+    const auto stream = at::cuda::getCurrentCUDAStream();
+
+    const auto dtype_int64 = torch::TensorOptions{}.dtype(torch::kInt64).device(sparse_indices.device());
+
+    const auto resolution_grid =
+            glm::i64vec3{ ravelled_tensor.size(3), ravelled_tensor.size(2), ravelled_tensor.size(1) };
+
+    const auto N = sparse_indices.numel();
+
+    auto sparse_indices_unraveled = torch::empty({ 4, N }, dtype_int64);
+
+    if (N != 0)
+    {
+        const int threads_per_block = 128;
+        dim3 grid;
+        at::cuda::getApplyGrid(N, grid, sparse_indices.device().index(), threads_per_block);
+        dim3 threads = at::cuda::getApplyBlock(threads_per_block);
+
+        extract_sparse_indices<<<grid, threads, 0, stream>>>(
+                sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
+                resolution_grid,
+                sparse_indices_unraveled.packed_accessor64<int64_t, 2, torch::RestrictPtrTraits>());
+        AT_CUDA_CHECK(cudaGetLastError());
+        AT_CUDA_CHECK(cudaStreamSynchronize(stream));
+    }
+
+    auto sparse_field =
+            torch::sparse_coo_tensor(sparse_indices_unraveled, ravelled_tensor.values(), ravelled_tensor.sizes())
+                    .coalesce();
+
+    return sparse_field;
 }
 
 std::tuple<RavelledSparseTensor, std::vector<torch::Tensor>>
@@ -585,6 +623,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
     const auto dtype_float = torch::TensorOptions{}.dtype(torch::kFloat32).device(masks.device());
 
     auto integral_masks = integral_image(masks, torch::kFloat32);
+
     auto candidates = torch::tensor({ 0 }, dtype_int64);
     auto candidates_octree = std::vector<torch::Tensor>{};
     candidates_octree.push_back(candidates);
@@ -711,6 +750,9 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
         }
     }
 
+    const auto resolution_cells = glm::i64vec3{ 1 << level };
+    const auto resolution_grid = resolution_cells + int64_t{ 1 };
+
     if (candidates.numel() == 0)
     {
         auto sparse_indices = torch::empty({ 0 }, dtype_int64);
@@ -718,7 +760,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
 
         return { RavelledSparseTensor{ sparse_indices,
                                        sparse_values,
-                                       { 1, (1 << level) + 1, (1 << level) + 1, (1 << level) + 1 } },
+                                       { 1, resolution_grid.z, resolution_grid.y, resolution_grid.x } },
                  candidates_octree };
     }
 
@@ -726,17 +768,10 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
     integral_masks = torch::Tensor{};
 
     // 2. Convert sparse cells to sparse grid indices
-    const auto resolution_cells = glm::i64vec3{ 1 << level };
-
-    void* d_temp_storage = nullptr;
-    size_t temp_storage_bytes = 0;
-    auto num_selected_out = torch::empty({ 1 }, dtype_int64).contiguous();
-
     auto all_corners = torch::empty({ 8 * candidates.numel() }, dtype_int64).contiguous();
     auto sparse_indices = torch::empty({ 8 * candidates.numel() }, dtype_int64).contiguous();
 
     auto candidates_ = candidates.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>();
-    const auto resolution_grid = resolution_cells + int64_t{ 1 };
 
     thrust::transform(policy,
                       thrust::counting_iterator<int64_t>(0),
@@ -754,6 +789,10 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                       });
 
     thrust::sort(policy, all_corners.data_ptr<int64_t>(), all_corners.data_ptr<int64_t>() + all_corners.numel());
+
+    void* d_temp_storage = nullptr;
+    size_t temp_storage_bytes = 0;
+    auto num_selected_out = torch::empty({ 1 }, dtype_int64).contiguous();
 
     // Unique is limited to 32-bit indices, at least up to cub 2.6
     TORCH_CHECK_LT(8 * candidates.numel(), (static_cast<int64_t>(1) << 31));
@@ -820,7 +859,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                                             masks_,
                                             transforms_,
                                             transforms_in_opengl,
-                                            resolution_cells,
+                                            resolution_grid,
                                             cube_corner_bfl_cuda,
                                             cube_length,
                                             batch,
@@ -836,7 +875,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
                                             masks_,
                                             transforms_,
                                             transforms_in_opengl,
-                                            resolution_cells,
+                                            resolution_grid,
                                             cube_corner_bfl_cuda,
                                             cube_length,
                                             batch,
@@ -850,7 +889,7 @@ sparse_visual_hull_field_cuda_ravelled(const torch::Tensor& masks,
 
     return { RavelledSparseTensor{ sparse_indices,
                                    sparse_values,
-                                   { 1, (1 << level) + 1, (1 << level) + 1, (1 << level) + 1 } },
+                                   { 1, resolution_grid.z, resolution_grid.y, resolution_grid.x } },
              candidates_octree };
 }
 
@@ -871,43 +910,7 @@ sparse_visual_hull_field_cuda(const torch::Tensor& masks,
                                                                      masks_partial,
                                                                      transforms_convention);
 
-    at::cuda::CUDAGuard device_guard{ masks.device() };
-    const auto stream = at::cuda::getCurrentCUDAStream();
-
-    const auto dtype_int64 = torch::TensorOptions{}.dtype(torch::kInt64).device(masks.device());
-    const auto dtype_float = torch::TensorOptions{}.dtype(torch::kFloat32).device(masks.device());
-
-    const auto resolution_cells = glm::i64vec3{ 1 << level };
-
-    // 4. Convert to sparse tensor
-    const auto N = sparse_volume.indices().numel();
-
-    auto sparse_indices_unraveled = torch::empty({ 4, N }, dtype_int64);
-    auto sparse_indices = sparse_volume.indices();
-
-    if (N != 0)
-    {
-        const int threads_per_block = 128;
-        dim3 grid_corners;
-        at::cuda::getApplyGrid(N, grid_corners, masks.device().index(), threads_per_block);
-        dim3 threads = at::cuda::getApplyBlock(threads_per_block);
-
-        extract_sparse_indices<<<grid_corners, threads, 0, stream>>>(
-                sparse_indices.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
-                resolution_cells,
-                sparse_indices_unraveled.packed_accessor64<int64_t, 2, torch::RestrictPtrTraits>());
-        AT_CUDA_CHECK(cudaGetLastError());
-        AT_CUDA_CHECK(cudaStreamSynchronize(stream));
-    }
-
-    auto sparse_field =
-            torch::sparse_coo_tensor(sparse_indices_unraveled,
-                                     sparse_volume.values(),
-                                     { 1, resolution_cells.x + 1, resolution_cells.y + 1, resolution_cells.z + 1 },
-                                     dtype_float)
-                    .coalesce();
-
-    return sparse_field;
+    return to_sparse_coo_tensor(sparse_volume);
 }
 
 template <typename scalar_t>

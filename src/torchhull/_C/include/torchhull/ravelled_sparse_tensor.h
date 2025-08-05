@@ -66,6 +66,12 @@ public:
         return sizes_[i];
     }
 
+    inline std::vector<int64_t>
+    sizes() const
+    {
+        return sizes_;
+    }
+
     inline torch::ScalarType
     scalar_type() const
     {
