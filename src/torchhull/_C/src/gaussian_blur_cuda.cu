@@ -447,6 +447,20 @@ gaussian_blur_cuda_sparse(const torch::Tensor& images,
     dim3 grid_convolution;
     at::cuda::getApplyGrid(M, grid_convolution, images.device().index(), threads_per_block);
 
+#define CASE_TILE_CONVOLUTION_KERNEL_SPECIALIZED(KERNEL_SIZE)                                                          \
+    case KERNEL_SIZE:                                                                                                  \
+    {                                                                                                                  \
+        tile_convolution_kernel_specialized<KERNEL_SIZE><<<grid_convolution, threads, 0, stream>>>(tile_indices_,      \
+                                                                                                   M,                  \
+                                                                                                   tile_size,          \
+                                                                                                   sigma,              \
+                                                                                                   images_,            \
+                                                                                                   blurred_images_);   \
+        DEFER(AT_CUDA_CHECK(cudaGetLastError());)                                                                      \
+        DEFER(AT_CUDA_CHECK(cudaStreamSynchronize(stream));)                                                           \
+    }                                                                                                                  \
+    break;
+
     AT_DISPATCH_ALL_TYPES_AND(
             torch::ScalarType::Half,
             images.scalar_type(),
@@ -463,20 +477,6 @@ gaussian_blur_cuda_sparse(const torch::Tensor& images,
                         {
                             auto blurred_images_ =
                                     blurred_images.packed_accessor64<scalar_t, 4, torch::RestrictPtrTraits>();
-
-#define CASE_TILE_CONVOLUTION_KERNEL_SPECIALIZED(KERNEL_SIZE)                                                          \
-    case KERNEL_SIZE:                                                                                                  \
-    {                                                                                                                  \
-        tile_convolution_kernel_specialized<KERNEL_SIZE><<<grid_convolution, threads, 0, stream>>>(tile_indices_,      \
-                                                                                                   M,                  \
-                                                                                                   tile_size,          \
-                                                                                                   sigma,              \
-                                                                                                   images_,            \
-                                                                                                   blurred_images_);   \
-        DEFER(AT_CUDA_CHECK(cudaGetLastError());)                                                                      \
-        DEFER(AT_CUDA_CHECK(cudaStreamSynchronize(stream));)                                                           \
-    }                                                                                                                  \
-    break;
 
                             switch (kernel_size)
                             {
