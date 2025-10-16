@@ -71,7 +71,9 @@ def docs_live(session: nox.Session) -> None:
     # sphinx-build
     force_building = "-E"
     watch_dirs_and_files = ["src", "README.md", "CHANGELOG.md"]
-    watch_args = [v for pair in zip(["--watch"] * len(watch_dirs_and_files), watch_dirs_and_files) for v in pair]
+    watch_args = [
+        v for pair in zip(["--watch"] * len(watch_dirs_and_files), watch_dirs_and_files, strict=True) for v in pair
+    ]
     session.run(
         "sphinx-autobuild",
         "-b",
