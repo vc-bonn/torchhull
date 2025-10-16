@@ -55,7 +55,7 @@ In particular, torchhull is a GPU implementation of the following paper:
 
 torchhull requires the following prerequites (for JIT compilation):
 
-- Python >= 3.9
+- Python >= 3.10
 - CUDA >= 12.1
 - C++17 compiler
 
