@@ -20,7 +20,7 @@ jobs:
         os:
           ["ubuntu-22.04", "windows-2025"]
           # "ubuntu-24.04" # Postponed as long as testing against CUDA 12.1, needs 12.6+
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     name: "${{ matrix.os }} / Python ${{ matrix.python }}"
     runs-on: ${{ matrix.os }}
