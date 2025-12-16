@@ -81,7 +81,6 @@ gaussian_blur_cuda_dense(const torch::Tensor& images,
     TORCH_CHECK_GT(sigma, 0.f);
 
     at::cuda::CUDAGuard device_guard{ images.device() };
-    const auto stream = at::cuda::getCurrentCUDAStream();
 
     const auto dtype_result = dtype ? *dtype : images.scalar_type();
 
