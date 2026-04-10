@@ -42,8 +42,8 @@ if(NOT TARGET stdgpu::stdgpu)
     FetchContent_Declare(
         stdgpu
         PREFIX stdgpu
-        URL https://github.com/stotko/stdgpu/archive/d7c07d056a654454c3f2d7cf928e6cec6e0ce28e.tar.gz
-        URL_HASH SHA256=85b38dc3807ac24b5afe8d06a674dbff8e66579dfd67cbb33189783b0a84a0aa
+        URL https://github.com/stotko/stdgpu/archive/0bebd1f51e686cb634461ab3a5271fb3c04560c4.tar.gz
+        URL_HASH SHA256=7c3b80cdc1715adbcb6d5f5af29beb5953730cb8357fe15b79281ec439934434
         DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/external/stdgpu"
         SYSTEM
     )
